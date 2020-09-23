@@ -1,4 +1,4 @@
 
-## 目次
+# 目次
 
-- [segtree_recursive.md]
+- [再帰セグメント木を Rust で書く](segtree_recursive.md)
