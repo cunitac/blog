@@ -8,8 +8,12 @@ pub enum AddU64 {}
 
 impl Monoid for AddU64 {
     type Item = u64;
-    fn id() -> u64 { 0 }
-    fn op(a: &u64, b: &u64) -> u64 { a + b }
+    fn id() -> u64 {
+        0
+    }
+    fn op(a: &u64, b: &u64) -> u64 {
+        a + b
+    }
 }
 
 /// 便利な列 `st`
@@ -39,14 +43,18 @@ impl<M: Monoid> SegTree<M> {
         }
     }
     /// `st = [M::id(); n]`
-    pub fn new(n: usize) -> Self { Self::from(&vec![M::id(); n][..]) }
+    pub fn new(n: usize) -> Self {
+        Self::from_slice(&vec![M::id(); n][..])
+    }
     pub fn from_slice(slice: &[M::Item]) -> Self {
         if slice.len() == 1 {
-            Self::Leaf { val: slice[0].clone() }
+            Self::Leaf {
+                val: slice[0].clone(),
+            }
         } else {
             let mid = slice.len() / 2;
-            let left = Self::from(&slice[.. mid]);
-            let right = Self::from(&slice[mid ..]);
+            let left = Self::from_slice(&slice[..mid]);
+            let right = Self::from_slice(&slice[mid..]);
             Self::Node {
                 len: slice.len(),
                 val: M::op(left.val(), right.val()),
@@ -60,7 +68,13 @@ impl<M: Monoid> SegTree<M> {
         assert!(i < self.len(), "index out: {}/{}", i, self.len());
         match self {
             Self::Leaf { val } => *val = v,
-            Self::Node { val, left, right, len, .. } => {
+            Self::Node {
+                val,
+                left,
+                right,
+                len,
+                ..
+            } => {
                 let mid = *len / 2;
                 if i < mid {
                     left.set(i, v);
@@ -76,7 +90,9 @@ impl<M: Monoid> SegTree<M> {
         assert!(i < self.len(), "index out: {}/{}", i, self.len());
         match self {
             Self::Leaf { val } => val,
-            Self::Node { left, right, len, .. } => {
+            Self::Node {
+                left, right, len, ..
+            } => {
                 let mid = len / 2;
                 if i < mid {
                     left.get(i)
@@ -100,7 +116,9 @@ impl<M: Monoid> SegTree<M> {
 
         match self {
             Self::Leaf { .. } => unreachable!(),
-            Self::Node { left, right, len, .. } => {
+            Self::Node {
+                left, right, len, ..
+            } => {
                 let mid = len / 2;
                 if end <= mid {
                     left.fold(start, end)
@@ -115,13 +133,17 @@ impl<M: Monoid> SegTree<M> {
     /// `pred(st.fold(start..end))` なる最大の `end`
     /// `pred(M::id())` が要請される
     pub fn max_end<P>(&self, start: usize, mut pred: P) -> usize
-    where P: FnMut(&M::Item) -> bool {
+    where
+        P: FnMut(&M::Item) -> bool,
+    {
         assert!(start <= self.len(), "index out: {}/{}", start, self.len());
         let mut acc = M::id();
         self.max_end_inner(start, &mut pred, &mut acc)
     }
     fn max_end_inner<P>(&self, start: usize, pred: &mut P, acc: &mut M::Item) -> usize
-    where P: FnMut(&M::Item) -> bool {
+    where
+        P: FnMut(&M::Item) -> bool,
+    {
         if start == 0 {
             let all_merged = M::op(acc, &self.val());
             if pred(&all_merged) {
@@ -134,7 +156,9 @@ impl<M: Monoid> SegTree<M> {
         }
         match self {
             Self::Leaf { .. } => 0,
-            Self::Node { left, right, len, .. } => {
+            Self::Node {
+                left, right, len, ..
+            } => {
                 let mid = len / 2;
                 if start < mid {
                     let left_max = left.max_end_inner(start, pred, acc);
@@ -149,13 +173,17 @@ impl<M: Monoid> SegTree<M> {
     /// `pred(st.fold(start..end))` なる最小の `start`
     /// `pred(M::id())` が要請される
     pub fn min_start<P>(&self, end: usize, mut pred: P) -> usize
-    where P: FnMut(&M::Item) -> bool {
+    where
+        P: FnMut(&M::Item) -> bool,
+    {
         assert!(end <= self.len(), "index out: {}/{}", end, self.len());
         let mut acc = M::id();
         self.min_start_inner(end, &mut pred, &mut acc)
     }
     fn min_start_inner<P>(&self, end: usize, pred: &mut P, acc: &mut M::Item) -> usize
-    where P: FnMut(&M::Item) -> bool {
+    where
+        P: FnMut(&M::Item) -> bool,
+    {
         if end == self.len() {
             let merged = M::op(acc, &self.val());
             if pred(&merged) {
@@ -168,7 +196,9 @@ impl<M: Monoid> SegTree<M> {
         }
         match self {
             Self::Leaf { .. } => 1,
-            Self::Node { left, right, len, .. } => {
+            Self::Node {
+                left, right, len, ..
+            } => {
                 let mid = len / 2;
                 if mid <= end {
                     let res_right = right.min_start_inner(end - mid, pred, acc);
@@ -182,27 +212,27 @@ impl<M: Monoid> SegTree<M> {
     }
 }
 
-impl<M: Monoid> From<&[M::Item]> for SegTree<M> {
-    fn from(slice: &[M::Item]) -> Self { Self::from_slice(slice) }
-}
-
 #[test]
 fn test_seg_tree() {
     pub enum M {}
     impl Monoid for M {
         type Item = i32;
-        fn id() -> i32 { 0 }
-        fn op(a: &i32, b: &i32) -> i32 { a + b }
+        fn id() -> i32 {
+            0
+        }
+        fn op(a: &i32, b: &i32) -> i32 {
+            a + b
+        }
     }
     let sq = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
     let st = SegTree::<M>::from(&sq[..]);
-    for i in 0 .. sq.len() {
-        for j in i .. sq.len() {
-            assert_eq!(sq[i .. j].iter().sum::<i32>(), st.fold(i, j))
+    for i in 0..sq.len() {
+        for j in i..sq.len() {
+            assert_eq!(sq[i..j].iter().sum::<i32>(), st.fold(i, j))
         }
     }
-    for start in 0 ..= sq.len() {
-        for max in 0 ..= 55 {
+    for start in 0..=sq.len() {
+        for max in 0..=55 {
             let mut acc = 0;
             let mut right = start;
             while right < sq.len() && acc + sq[right] <= max {
@@ -212,15 +242,21 @@ fn test_seg_tree() {
             assert_eq!(st.max_end(start, |&sum| sum <= max), right);
         }
     }
-    for end in 0 ..= sq.len() {
-        for max in 0 ..= 55 {
+    for end in 0..=sq.len() {
+        for max in 0..=55 {
             let mut acc = 0;
             let mut left = end;
             while left > 0 && acc + sq[left - 1] <= max {
                 left -= 1;
                 acc += sq[left];
             }
-            assert_eq!(st.min_start(end, |&sum| sum <= max), left, "{} {}", end, max);
+            assert_eq!(
+                st.min_start(end, |&sum| sum <= max),
+                left,
+                "{} {}",
+                end,
+                max
+            );
         }
     }
 }

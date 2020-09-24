@@ -120,8 +120,8 @@ fn from_slice(slice: &[M::Item]) -> Self {
         Self::Leaf { val: slice[0].clone() }
     } else {
         let mid = slice.len() / 2;
-        let left = Self::from(&slice[.. mid]);
-        let right = Self::from(&slice[mid ..]);
+        let left = Self::from_slice(&slice[.. mid]);
+        let right = Self::from_slice(&slice[mid ..]);
         Self::Node {
             len: slice.len(),
             val: M::op(left.val(), right.val()),
