@@ -47,6 +47,7 @@ impl<M: Monoid> SegTree<M> {
         Self::from_slice(&vec![M::id(); n][..])
     }
     pub fn from_slice(slice: &[M::Item]) -> Self {
+        assert!(!slice.is_empty());
         if slice.len() == 1 {
             Self::Leaf {
                 val: slice[0].clone(),

@@ -41,7 +41,7 @@ Monoid というのは数学における類似の概念の名前です．
 
 ### 定義
 
-`M: Monoid` とします．`M::Item` の列 `a` のSegment Tree は
+`M: Monoid` とします．`M::Item` の空でない列 `a` のSegment Tree は
 
 - `a` の長さ `len`
 - `a` の全ての要素の積 `val`
@@ -116,6 +116,8 @@ impl<M: Monoid> SegTree<M> {
 
 ```rust
 fn from_slice(slice: &[M::Item]) -> Self {
+    assert!(!slice.is_empty());
+
     if slice.len() == 1 {
         Self::Leaf { val: slice[0].clone() }
     } else {
@@ -131,6 +133,8 @@ fn from_slice(slice: &[M::Item]) -> Self {
     }
 }
 ```
+
+今回作る Segment Tree は長さ `0` の列を扱いません．
 
 `slice.len() == 1` ならば `Leaf` を返せばよいです．
 
