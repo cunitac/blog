@@ -16,7 +16,6 @@ impl Monoid for AddU64 {
     }
 }
 
-/// 便利な列 `st`
 pub enum SegTree<M: Monoid> {
     Leaf {
         val: M::Item,
@@ -42,7 +41,6 @@ impl<M: Monoid> SegTree<M> {
             Self::Node { val, .. } => val,
         }
     }
-    /// `st = [M::id(); n]`
     pub fn new(n: usize) -> Self {
         Self::from_slice(&vec![M::id(); n][..])
     }
@@ -64,7 +62,6 @@ impl<M: Monoid> SegTree<M> {
             }
         }
     }
-    /// `st[i] = v`
     pub fn set(&mut self, i: usize, v: M::Item) {
         assert!(i < self.len(), "index out: {}/{}", i, self.len());
         match self {
@@ -86,7 +83,6 @@ impl<M: Monoid> SegTree<M> {
             }
         }
     }
-    /// `st[i]`
     pub fn get(&self, i: usize) -> &M::Item {
         assert!(i < self.len(), "index out: {}/{}", i, self.len());
         match self {
@@ -103,7 +99,6 @@ impl<M: Monoid> SegTree<M> {
             }
         }
     }
-    /// `st[range].fold(M::id(), |a, b| M::op(&a, &b))`
     pub fn fold(&self, start: usize, end: usize) -> M::Item {
         assert!(start <= end, "invalid range: {}..{}", start, end);
         assert!(end <= self.len(), "index out: {}/{}", end, self.len());
@@ -131,8 +126,6 @@ impl<M: Monoid> SegTree<M> {
             }
         }
     }
-    /// `pred(st.fold(start..end))` なる最大の `end`
-    /// `pred(M::id())` が要請される
     pub fn max_end<P>(&self, start: usize, mut pred: P) -> usize
     where
         P: FnMut(&M::Item) -> bool,
@@ -171,8 +164,6 @@ impl<M: Monoid> SegTree<M> {
             }
         }
     }
-    /// `pred(st.fold(start..end))` なる最小の `start`
-    /// `pred(M::id())` が要請される
     pub fn min_start<P>(&self, end: usize, mut pred: P) -> usize
     where
         P: FnMut(&M::Item) -> bool,
@@ -209,55 +200,6 @@ impl<M: Monoid> SegTree<M> {
                 }
                 left.min_start_inner(end.min(mid), pred, acc)
             }
-        }
-    }
-}
-
-#[test]
-fn test_seg_tree() {
-    pub enum M {}
-    impl Monoid for M {
-        type Item = i32;
-        fn id() -> i32 {
-            0
-        }
-        fn op(a: &i32, b: &i32) -> i32 {
-            a + b
-        }
-    }
-    let sq = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-    let st = SegTree::<M>::from(&sq[..]);
-    for i in 0..sq.len() {
-        for j in i..sq.len() {
-            assert_eq!(sq[i..j].iter().sum::<i32>(), st.fold(i, j))
-        }
-    }
-    for start in 0..=sq.len() {
-        for max in 0..=55 {
-            let mut acc = 0;
-            let mut right = start;
-            while right < sq.len() && acc + sq[right] <= max {
-                acc += sq[right];
-                right += 1;
-            }
-            assert_eq!(st.max_end(start, |&sum| sum <= max), right);
-        }
-    }
-    for end in 0..=sq.len() {
-        for max in 0..=55 {
-            let mut acc = 0;
-            let mut left = end;
-            while left > 0 && acc + sq[left - 1] <= max {
-                left -= 1;
-                acc += sq[left];
-            }
-            assert_eq!(
-                st.min_start(end, |&sum| sum <= max),
-                left,
-                "{} {}",
-                end,
-                max
-            );
         }
     }
 }
