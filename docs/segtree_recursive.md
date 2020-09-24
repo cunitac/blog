@@ -117,9 +117,7 @@ impl<M: Monoid> SegTree<M> {
 ```rust
 fn from_slice(slice: &[M::Item]) -> Self {
     if slice.len() == 1 {
-        Self::Leaf {
-            val: slice[0].clone(),
-        }
+        Self::Leaf { val: slice[0].clone() }
     } else {
         let mid = slice.len() / 2;
         let left = Self::from(&slice[.. mid]);
@@ -150,8 +148,8 @@ fn get(&self, i: usize) -> &M::Item {
 
     match self {
         Self::Leaf { val } => val,
-        Self::Node { left, right, .. } => {
-            let mid = self.len() / 2;
+        Self::Node { left, right, len, .. } => {
+            let mid = len / 2;
             if i < mid {
                 left.get(i)
             } else {
@@ -214,13 +212,11 @@ fn fold(&self, start: usize, end: usize) -> M::Item {
             } else if mid <= start {
                 right.fold(start - mid, end - mid)
             } else {
-                M::op(
-                    &left.fold(start, mid),
-                    &right.fold(0, end - mid),
-                )
+                M::op(&left.fold(start, mid), &right.fold(0, end - mid))
             }
         }
     }
+}
 ```
 
 区間の長さが `0` のときは `id()` を返すようにしておきましょう．空の配列の総和を `0` と定めるようなものです．好みで `None` などにしてもよいでしょう．
@@ -248,7 +244,7 @@ fn fold(&self, start: usize, end: usize) -> M::Item {
 ```rust
 fn max_end<P>(&self, start: usize, mut pred: P) -> usize
 where P: FnMut(&M::Item) -> bool {
-    assert!(start <= self.len());
+    assert!(start <= self.len(), "index out: {}/{}", start, self.len());
     let mut acc = M::id();
     self.max_end_inner(start, &mut pred, &mut acc)
 }
@@ -266,21 +262,15 @@ where P: FnMut(&M::Item) -> bool {
     }
     match self {
         Self::Leaf { .. } => 0,
-        Self::Node {
-            left, right, len, ..
-        } => {
+        Self::Node { left, right, len, .. } => {
             let mid = len / 2;
             if start < mid {
-                let left_max = left.max_end_inner(
-                    start, pred, acc
-                );
+                let left_max = left.max_end_inner(start, pred, acc);
                 if left_max < mid {
                     return left_max;
                 }
             }
-            mid + right.max_end_inner(
-                start.max(mid) - mid, pred, acc
-            )
+            mid + right.max_end_inner(start.max(mid) - mid, pred, acc)
         }
     }
 }
@@ -297,7 +287,7 @@ where P: FnMut(&M::Item) -> bool {
 ```rust
 fn min_start<P>(&self, end: usize, mut pred: P) -> usize
 where P: FnMut(&M::Item) -> bool {
-    assert!(end <= self.len());
+    assert!(end <= self.len(), "index out: {}/{}", end, self.len());
     let mut acc = M::id();
     self.min_start_inner(end, &mut pred, &mut acc)
 }
@@ -315,14 +305,10 @@ where P: FnMut(&M::Item) -> bool {
     }
     match self {
         Self::Leaf { .. } => 1,
-        Self::Node {
-            left, right, len, ..
-        } => {
+        Self::Node { left, right, len, .. } => {
             let mid = len / 2;
             if mid <= end {
-                let res_right = right.min_start_inner(
-                    end - mid, pred, acc
-                );
+                let res_right = right.min_start_inner(end - mid, pred, acc);
                 if res_right > 0 {
                     return mid + res_right;
                 }
@@ -335,5 +321,4 @@ where P: FnMut(&M::Item) -> bool {
 
 ## おわりに
 
-- `assert` のメッセージは書いたほうがいい気がします．ノイズになるので消しました．
-- さすがに実用には向いていないと思います．
+Segment Tree の解説に需要はなさそうですが，再帰的な実装をしてみるのもけっこう楽しいなぁと思ったので書きました．あと GitHub Pages すごいなぁと思ったので試しになにか書いてみたかったというのがあります．

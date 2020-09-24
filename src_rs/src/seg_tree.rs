@@ -42,9 +42,7 @@ impl<M: Monoid> SegTree<M> {
     pub fn new(n: usize) -> Self { Self::from(&vec![M::id(); n][..]) }
     pub fn from_slice(slice: &[M::Item]) -> Self {
         if slice.len() == 1 {
-            Self::Leaf {
-                val: slice[0].clone(),
-            }
+            Self::Leaf { val: slice[0].clone() }
         } else {
             let mid = slice.len() / 2;
             let left = Self::from(&slice[.. mid]);
@@ -62,13 +60,7 @@ impl<M: Monoid> SegTree<M> {
         assert!(i < self.len(), "index out: {}/{}", i, self.len());
         match self {
             Self::Leaf { val } => *val = v,
-            Self::Node {
-                val,
-                left,
-                right,
-                len,
-                ..
-            } => {
+            Self::Node { val, left, right, len, .. } => {
                 let mid = *len / 2;
                 if i < mid {
                     left.set(i, v);
@@ -84,9 +76,7 @@ impl<M: Monoid> SegTree<M> {
         assert!(i < self.len(), "index out: {}/{}", i, self.len());
         match self {
             Self::Leaf { val } => val,
-            Self::Node {
-                left, right, len, ..
-            } => {
+            Self::Node { left, right, len, .. } => {
                 let mid = len / 2;
                 if i < mid {
                     left.get(i)
@@ -110,9 +100,7 @@ impl<M: Monoid> SegTree<M> {
 
         match self {
             Self::Leaf { .. } => unreachable!(),
-            Self::Node {
-                left, right, len, ..
-            } => {
+            Self::Node { left, right, len, .. } => {
                 let mid = len / 2;
                 if end <= mid {
                     left.fold(start, end)
@@ -146,9 +134,7 @@ impl<M: Monoid> SegTree<M> {
         }
         match self {
             Self::Leaf { .. } => 0,
-            Self::Node {
-                left, right, len, ..
-            } => {
+            Self::Node { left, right, len, .. } => {
                 let mid = len / 2;
                 if start < mid {
                     let left_max = left.max_end_inner(start, pred, acc);
@@ -182,9 +168,7 @@ impl<M: Monoid> SegTree<M> {
         }
         match self {
             Self::Leaf { .. } => 1,
-            Self::Node {
-                left, right, len, ..
-            } => {
+            Self::Node { left, right, len, .. } => {
                 let mid = len / 2;
                 if mid <= end {
                     let res_right = right.min_start_inner(end - mid, pred, acc);
@@ -236,13 +220,7 @@ fn test_seg_tree() {
                 left -= 1;
                 acc += sq[left];
             }
-            assert_eq!(
-                st.min_start(end, |&sum| sum <= max),
-                left,
-                "{} {}",
-                end,
-                max
-            );
+            assert_eq!(st.min_start(end, |&sum| sum <= max), left, "{} {}", end, max);
         }
     }
 }
