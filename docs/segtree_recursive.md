@@ -321,4 +321,17 @@ where P: FnMut(&M::Item) -> bool {
 
 ## おわりに
 
+### 感想
+
 Segment Tree の解説に需要はなさそうですが，再帰的な実装をしてみるのもけっこう楽しいなぁと思ったので書きました．あと GitHub Pages すごいなぁと思ったので試しになにか書いてみたかったというのがあります．
+
+### verify
+
+`min_start` 確認してないです，思ったより速い……？
+
+[AtCoder Library Practice Contest J](https://atcoder.jp/contests/practice2/submissions/16993602)
+
+
+### 注意
+
+`pub` とか，`assert` のメッセージとかはノイズになる気がしたので除きました．
