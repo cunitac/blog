@@ -90,7 +90,7 @@ Leaf, Node は木の再帰的な定義でよく使われる語です．[`Box` �
 
 ### フィールドの取得
 
-長さと全要素の積は取得できるようにしておくとよいでしょう．`prod_ref` は可能なので書いてありますが，省いても良いと思います．作成のときに `clone` の回数がやや減ります．
+長さと全要素の積は取得できるようにしておくとよいでしょう．`Leaf` の要素は1つしかありませんが，その積はその要素そのものとします．
 
 ```rust
 impl<T: SegTreeType> SegTree<T> {
@@ -100,37 +100,35 @@ impl<T: SegTreeType> SegTree<T> {
             Self::Node { len, .. } => *len,
         }
     }
-    pub fn prod_ref(&self) -> &T::Item {
+    pub fn prod(&self) -> &T::Item {
         match self {
             Self::Leaf { val } => val,
             Self::Node { prod, .. } => prod,
         }
     }
-    pub fn prod(&self) -> T::Item {
-        self.prod_ref().clone()
-    }
 }
 ```
 
-以下，`impl` ブロックの内側だけを記述します．
-
-### new
+### `new`
 
 すべて `id()` で長さ `n` の列の Segment Tree を作成します．
 
 ```rust
-pub fn new(n: usize) -> Self {
-    assert_ne!(n, 0);
-    if n == 1 {
-        Self::Leaf { val: T::id() }
-    } else {
-        let left = Self::new(n / 2);
-        let right = Self::new(n - n / 2);
-        Self::Node {
-            len: n,
-            prod: T::id(),
-            left: Box::new(Self::new(n / 2)),
-            right: Box::new(Self::new(n - n / 2)),
+impl<T: SegTreeType> SegTree<T> {
+    pub fn new(n: usize) -> Self {
+        assert_ne!(n, 0);
+
+        if n == 1 {
+            Self::Leaf { val: T::id() }
+        } else {
+            let left = Self::new(n / 2);
+            let right = Self::new(n - n / 2);
+            Self::Node {
+                len: n,
+                prod: T::id(),
+                left: Box::new(left),
+                right: Box::new(right),
+            }
         }
     }
 }
@@ -140,47 +138,50 @@ pub fn new(n: usize) -> Self {
 
 ### slice からの作成
 
-`prod` 以外は `new` とほぼ同じといってよいでしょう．
+`prod` 以外は `new` とほぼ同じといってよいでしょう．trait `From` を実装する形にします．
 
 ```rust
-pub fn from_slice(slice: &[M::Item]) -> Self {
-    assert!(!slice.is_empty());
-
-    if slice.len() == 1 {
-        Self::Leaf {
-            val: slice[0].clone(),
-        }
-    } else {
-        let mid = slice.len() / 2;
-        let left = Self::from_slice(&slice[..mid]);
-        let right = Self::from_slice(&slice[mid..]);
-        Self::Node {
-            len: slice.len(),
-            prod: T::prod(left.prod_ref(), right.prod_ref()),
-            left: Box::new(left),
-            right: Box::new(right),
+impl<T: SegTreeType> From<&[T::Item]> for SegTree<T> {
+    fn from(slice: &[T::Item]) -> Self {
+        if slice.len() == 1 {
+            Self::Leaf {
+                val: slice[0].clone(),
+            }
+        } else {
+            let mid = slice.len() / 2;
+            let left = Self::from(&slice[..mid]);
+            let right = Self::from(&slice[mid..]);
+            Self::Node {
+                len: slice.len(),
+                prod: T::prod(left.prod(), right.prod()),
+                left: Box::new(left),
+                right: Box::new(right),
+            }
         }
     }
 }
 ```
 
-`left` と `right` を先に作ってしまえば，`prod` の計算は驚くほど簡単です．左右それぞれの積の積は全体の積になります．`prod_ref()` を作らない場合は `&prod()` を使ってもよいでしょう．
+`left` と `right` を先に作ってしまえば，`prod` の計算は驚くほど簡単です．左右それぞれの積の積は全体の積になります．
 
 ### 任意の位置の要素を取得する
 
-`i` 番目を得ます．0-indexed です．
+`i` 番目を得ます．
 
 ```rust
-pub fn get(&self, i: usize) -> &T::Item {
-    assert!(i < self.len());
-    match self {
-        Self::Leaf { val } => val,
-        Self::Node { left, right, .. } => {
-            let mid = left.len();
-            if i < mid {
-                left.get(i)
-            } else {
-                right.get(i - mid)
+impl<T: SegTreeType> SegTree<T> {
+    pub fn get(&self, i: usize) -> &T::Item {
+        assert!(i < self.len());
+
+        match self {
+            Self::Leaf { val } => val,
+            Self::Node { left, right, .. } => {
+                let mid = left.len();
+                if i < mid {
+                    left.get(i)
+                } else {
+                    right.get(i - mid)
+                }
             }
         }
     }
@@ -193,22 +194,29 @@ pub fn get(&self, i: usize) -> &T::Item {
 
 ### 任意の位置の要素を変更する
 
-`i` 番目を `v` に変更します．
+`modify` は `i` 番目の要素の可変参照を `x` として，`f(x)` をします．`set` はそれを利用し，`i` 番目の要素を `v` にします．
 
 ```rust
-pub fn set(&mut self, i: usize, v: T::Item) {
-    assert!(i < self.len());
-    match self {
-        Self::Leaf { val } => *val = v,
-        Self::Node { left, right, prod, .. } => {
-            let mid = left.len();
-            if i < mid {
-                left.set(i, v)
-            } else {
-                right.set(i - mid, v)
+impl<T: SegTreeType> SegTree<T> {
+    pub fn modify(&mut self, i: usize, f: impl FnOnce(&mut T::Item)) {
+        assert!(i < self.len(), "index out: {}/{}", i, self.len());
+        match self {
+            Self::Leaf { val } => f(val),
+            Self::Node {
+                prod, left, right, ..
+            } => {
+                let mid = left.len();
+                if i < mid {
+                    left.modify(i, f);
+                } else {
+                    right.modify(i - mid, f);
+                }
+                *prod = T::prod(left.prod(), right.prod())
             }
-            *prod = T::prod(left.prod_ref(), right.prod_ref());
         }
+    }
+    pub fn set(&mut self, i: usize, v: T::Item) {
+        self.modify(i, |x| *x = v);
     }
 }
 ```
@@ -221,7 +229,7 @@ pub fn set(&mut self, i: usize, v: T::Item) {
 
 ```rust
 use std::ops::{Bound, Range, RangeBounds};
-fn range_from(&self, range: impl RangeBounds<usize>) -> Range<usize> {
+fn range_from(len: usize, range: impl RangeBounds<usize>) -> Range<usize> {
     use Bound::*;
     let start = match range.start_bound() {
         Included(&a) => a,
@@ -231,69 +239,61 @@ fn range_from(&self, range: impl RangeBounds<usize>) -> Range<usize> {
     let end = match range.end_bound() {
         Excluded(&a) => a,
         Included(&a) => a + 1,
-        Unbounded => self.len(),
+        Unbounded => len,
     };
-    assert!(start <= end);
-    assert!(end <= self.len());
+    assert!(start <= end, "invalid range: {}..{}", start, end);
+    assert!(end <= len, "index out: {}/{}", end, len);
     Range { start, end }
 }
 ```
 
-引数には `self` をとらず，`len` だけとるようにしてもいいかもしれません．
+引数には `self` をとらず，`len` だけとるようにしてもいいかもしれません．続いて本体です．
 
 ```rust
-pub fn prod_range(&self, range: impl RangeBounds<usize>) -> T::Item {
-    let Range { start, end } = self.range_from(range);
-    if start == end {
-        return T::id();
+impl<T: SegTreeType> SegTree<T> {
+    pub fn prod_range(&self, range: impl RangeBounds<usize>) -> T::Item {
+        let Range { start, end } = self.range_from(range);
+        if start == end {
+            return T::id();
+        } else if start + self.len() == end {
+            return self.prod().clone();
+        }
+        self.prod_range_inner(start, end)
     }
-    self.prod_range_inner(start, end)
-}
-fn prod_range_inner(&self, start: usize, end: usize) -> T::Item {
-    match self {
-        Self::Leaf { val } => val.clone(),
-        Self::Node { len, prod, left, right } => {
-            if start + len == end {
-                return prod.clone();
-            }
-            let mid = left.len();
-            if end <= mid {
-                left.prod_range_inner(start, end)
-            } else if mid <= start {
-                right.prod_range_inner(start - mid, end - mid)
-            } else {
-                T::prod(
-                    &left.prod_range_inner(start, mid),
-                    &right.prod_range_inner(0, end - mid),
-                )
+    fn prod_range_inner(&self, start: usize, end: usize) -> T::Item {
+        match self {
+            Self::Leaf { val } => val.clone(),
+            Self::Node {
+                len, left, right, ..
+            } => {
+                let mid = left.len();
+                if end <= mid {
+                    left.prod_range_inner(start, end)
+                } else if mid <= start {
+                    right.prod_range_inner(start - mid, end - mid)
+                } else if start == 0 {
+                    T::prod(left.prod(), &right.prod_range_inner(0, end - mid))
+                } else if end == *len {
+                    T::prod(&left.prod_range_inner(start, mid), right.prod())
+                } else {
+                    T::prod(
+                        &left.prod_range_inner(start, mid),
+                        &right.prod_range_inner(0, end - mid),
+                    )
+                }
             }
         }
     }
+}
 ```
 
-区間の長さが `0` ，すなわち `start == end` のときは `id()` を返すようにしておきましょう．空の配列の総和を `0` と定めるようなものです．`None` でもよいかもしれません．
+区間の長さが `0` ，すなわち `start == end` のときは `id()` を返すようにしておきましょう．空の配列の総和を `0` と定めるようなものです．`None` でもよいかもしれません．区間全体なら `prod()` です．
 
-`prod_range_inner` には長さ `1` 以上の半開区間のみが渡されます．
+`prod_range_inner` には長さ `1` 以上 `len` 未満の半開区間のみが渡されることになります．
 
 `Leaf` の場合は，`val` をそのまま返せばよいです．
 
-`Node` の場合は，`left` 内の区間か，`right` 内の区間か，両方にまたがった区間か，を判断し，計算すればよいです．
-
-またがっているときに `clone` が無駄になるのが気になる場合，以下のように書けます．
-
-```rust
-let left_prod = if start == 0 {
-    left.prod_ref()
-} else {
-    &left.prod_range_inner(start, mid)
-};
-let right_prod = if end == *len {
-    right.prod_ref()
-} else {
-    &right.prod_range_inner(0, end - mid)
-};
-T::prod(left_prod, right_prod)
-```
+`Node` の場合は，`left` 内の区間か，`right` 内の区間か，両方にまたがった区間か，を判断し，計算すればよいです．左や右の全区間であれば `prod()` を使用します．
 
 ## 計算量解析
 
@@ -305,105 +305,118 @@ T::prod(left_prod, right_prod)
 
 ### `max_end`
 
-`pred(id())` である必要があります．
+`p(id())` である必要があります．
 
-`pred(prod_range(start..end)) && !pred(prod_range(start..=end))` であるような `end` をひとつ返します．そのような `end` が一つしかない場合，`pred(prod_range(start..end))` であるような最大の `end` といえます．
+`p(prod_range(start..end)) && !p(prod_range(start..=end))` であるような `end` をひとつ返します．そのような `end` が一つしかない場合，`p(prod_range(start..end))` であるような最大の `end` といえます．
 
-`pred(prod_range(start..))` である場合は `len` を返します．
+`p(prod_range(start..))` である場合は `len` を返します．
 
 ```rust
-pub fn max_end<P>(&self, start: usize, mut pred: P) -> usize
-where P: FnMut(&T::Item) -> bool,
-{
-    assert!(start <= self.len());
-    if start == self.len() {
-        return start;
-    }
-    let mut acc = T::id();
-    self.max_end_inner(start, &mut pred, &mut acc)
-}
-fn max_end_inner<P>(&self, start: usize, pred: &mut P, acc: &mut T::Item) -> usize
-where P: FnMut(&T::Item) -> bool,
-{
-    if start == 0 {
-        let merged = T::prod(acc, self.prod_ref());
-        if pred(&merged) {
-            *acc = merged;
-            return self.len();
+impl<T: SegTreeType> SegTree<T> {
+    pub fn max_end(&self, start: usize, p: impl FnMut(&T::Item) -> bool) -> usize {
+        assert!(start <= self.len(), "index out: {}/{}", start, self.len());
+        if start == self.len() {
+            return start;
         }
+        let mut acc = T::id();
+        self.max_end_inner(start, p, &mut acc)
     }
-    match self {
-        Self::Leaf { val } => 0
-        Self::Node { left, right, .. } => {
-            let merged = T::prod(acc, prod);
-            if pred(&merged) {
-                *acc = merged;
-                return self.len();
+    fn max_end_inner(
+        &self,
+        start: usize,
+        mut p: impl FnMut(&T::Item) -> bool,
+        acc: &mut T::Item,
+    ) -> usize {
+        match self {
+            Self::Leaf { val } => {
+                if p(&T::prod(val, acc)) {
+                    1
+                } else {
+                    0
+                }
             }
-            let mid = left.len();
-            if mid <= start {
-                return mid + right.max_end_inner(start - mid, pred, acc);
-            }
-            let res_l = left.max_end_inner(start, pred, acc);
-            if res_l != mid {
-                res_l
-            } else {
-                mid + right.max_end_inner(0, pred, acc)
+            Self::Node {
+                prod, left, right, ..
+            } => {
+                let merged = T::prod(acc, prod);
+                if p(&merged) {
+                    *acc = merged;
+                    return self.len();
+                }
+                let mid = left.len();
+                if mid <= start {
+                    return mid + right.max_end_inner(start - mid, p, acc);
+                }
+                let res_l = left.max_end_inner(start, p, acc);
+                if res_l != mid {
+                    res_l
+                } else {
+                    mid + right.max_end_inner(0, p, acc)
+                }
             }
         }
     }
 }
 ```
 
-`max_end_inner` に渡される `start` は `len` より小さいです．うまく追加していき，`acc` が `prod_range(start..x)` であって常に `pred(acc)` となるようにします．
+`max_end_inner` に渡される `start` は `len` より小さいです．うまく追加していき，`acc` が `prod_range(start..x)` であって常に `p(acc)` となるようにします．
 
 `start == 0` なら全部含められるかを試しておきます．
 
-`Leaf` なら `start == 0` のはずです．つまり，ここに到達しているのは，`!pred(&merged)` であったということですから，`0` を返します．
+`Leaf` なら `start == 0` のはずです．つまり，ここに到達しているのは，`!p(&merged)` であったということですから，`0` を返します．
 
 `Node` なら，`mid <= start` であれば右だけで考えます．右の答えを全体の答えに変換するには `mid` を加えます．そうでなければ，左で試し，左の途中までならそれが答えです．左をすべて含められるなら右で考えます．
 
 ### `min_start`
 
-`pred(id())` である必要があります．
+`p(id())` である必要があります．
 
-`pred(fold(start..end)) && !pred(fold(start-1..end))` であるような `start` をひとつ返します．そのような `start` が一つしかない場合，`pred(fold(start..end))` であるような最小の `start` といえます．
+`p(fold(start..end)) && !p(fold(start-1..end))` であるような `start` をひとつ返します．そのような `start` が一つしかない場合，`p(fold(start..end))` であるような最小の `start` といえます．
 
-`pred(fold(..end))` である場合は `0` を返します．
+`p(fold(..end))` である場合は `0` を返します．
 
 ```rust
-pub fn min_start<P>(&self, end: usize, mut pred: P) -> usize
-where P: FnMut(&T::Item) -> bool,
-{
-    assert!(end <= self.len());
-    if end == 0 {
-        return 0;
-    }
-    let mut acc = T::id();
-    self.min_start_inner(end, &mut pred, &mut acc)
-}
-fn min_start_inner<P>(&self, end: usize, pred: &mut P, acc: &mut T::Item) -> usize
-where P: FnMut(&T::Item) -> bool,
-{
-    if end == self.len() {
-        let merged = T::prod(self.prod_ref(), acc);
-        if pred(&merged) {
-            *acc = merged;
+impl<T: SegTreeType> SegTree<T> {
+    pub fn min_start(&self, end: usize, mut p: impl FnMut(&T::Item) -> bool) -> usize {
+        assert!(end <= self.len(), "index out: {}/{}", end, self.len());
+        if end == 0 {
             return 0;
         }
+        let mut acc = T::id();
+        self.min_start_inner(end, &mut p, &mut acc)
     }
-    match self {
-        Self::Leaf { .. } => 1,
-        Self::Node { left, right, .. } => {
-            let mid = left.len();
-            if end <= mid {
-                return left.min_start_inner(end, pred, acc);
+    fn min_start_inner(
+        &self,
+        end: usize,
+        p: &mut impl FnMut(&T::Item) -> bool,
+        acc: &mut T::Item,
+    ) -> usize {
+        match self {
+            Self::Leaf { val } => {
+                if p(&T::prod(val, acc)) {
+                    0
+                } else {
+                    1
+                }
             }
-            let res_right = right.min_start_inner(end - mid, pred, acc);
-            if res_right != 0 {
-                res_right
-            } else {
-                left.min_start_inner(mid, pred, acc)
+            Self::Node {
+                prod, left, right, ..
+            } => {
+                let merged = T::prod(prod, acc);
+                if p(&merged) {
+                    *acc = merged;
+                    return 0;
+                }
+                let mid = left.len();
+                if end <= mid {
+                    return left.min_start_inner(end, p, acc);
+                }
+                let res_right = right.min_start_inner(end - mid, p, acc);
+                if res_right != 0 {
+                    res_right
+                } else {
+                    left.min_start_inner(mid, p, acc)
+                }
             }
         }
     }
