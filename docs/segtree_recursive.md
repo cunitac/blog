@@ -93,7 +93,7 @@ Leaf, Node は木の再帰的な定義でよく使われる語です．[`Box` �
 長さと全要素の積は取得できるようにしておくとよいでしょう．`prod_ref` は可能なので書いてありますが，省いても良いと思います．作成のときに `clone` の回数がやや減ります．
 
 ```rust
-impl<M: Monoid> SegTree<M> {
+impl<T: SegTreeType> SegTree<T> {
     pub fn len(&self) -> usize {
         match self {
             Self::Leaf { .. } => 1,
@@ -143,7 +143,7 @@ pub fn new(n: usize) -> Self {
 `prod` 以外は `new` とほぼ同じといってよいでしょう．
 
 ```rust
-fn from_slice(slice: &[M::Item]) -> Self {
+pub fn from_slice(slice: &[M::Item]) -> Self {
     assert!(!slice.is_empty());
 
     if slice.len() == 1 {
