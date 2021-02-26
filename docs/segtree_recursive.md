@@ -20,10 +20,10 @@ trait SegTreeType {
 }
 ```
 
-ただし，以下が常に成り立つこととします．`a` は任意の `&Item` です．
+ただし，`SegTreeType` を実装する際には以下を満たすように気をつけなければなりません．ここで，`a` は任意の `&Item` です．
 
-- `prod(id(), a) = prod(a, id()) = a`
-- `prod(a, prod(b, c)) = prod(prod(a, b), c)`
+- `prod(&id(), a) = prod(a, &id()) = a`
+- `prod(a, &prod(b, c)) = prod(&prod(a, b), c)`
 
 また，`prod(&a, &b)` を `a, b` の**積**と呼び，さらに，上記の性質から `prod(&a, prod(&b, &c))` や `prod(prod(&a, &b), &c)` を単に `a, b, c` の積と呼びます．4つ以上の積についても同様です．（ここでは `a, b, c` は任意の `Item` です．）
 
@@ -199,7 +199,7 @@ impl<T: SegTreeType> SegTree<T> {
 ```rust
 impl<T: SegTreeType> SegTree<T> {
     pub fn modify(&mut self, i: usize, f: impl FnOnce(&mut T::Item)) {
-        assert!(i < self.len(), "index out: {}/{}", i, self.len());
+        assert!(i < self.len());
         match self {
             Self::Leaf { val } => f(val),
             Self::Node {
